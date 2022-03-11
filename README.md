@@ -1,2 +1,2 @@
 # hello word
-inital commit
+inital commit (beans)
