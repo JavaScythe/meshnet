@@ -1,2 +1,2 @@
-# hello word
-inital commit (beans-ii)
+# openFMS
+fip: handshake with discovered

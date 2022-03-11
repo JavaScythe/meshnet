@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>openFMN</title>
+	</head>
+	<body>
+		<pre id="logs">log top</pre>
+		<script src="https://unpkg.com/peerjs@1.3.1/dist/peerjs.min.js"></script>
+		<script>
+			function log(m){
+				document.getElementById("logs").textContent = document.getElementById("logs").textContent+"\n"+m;
+				return m;
+			}
+			async function checkConn(conn){
+				var con = false;
+				conn.on('open', function() {
+					con=true;
+					conn.close();
+				});
+				await new Promise(resolve => setTimeout(resolve, 1000));
+				return con;
+			}
+			async function onReady(id){
+				log("readied peerjs with id "+id);
+				var cb = false;
+				for(var i = 0; i<=10; i++){
+					//`openfnm-node${i}-x`
+					//"603f7dde-1d37-425b-8f5c-0e2a081a5859"
+					var conn = peer.connect(`openfnm-node${i}-x`);
+					var w = await checkConn(conn);
+					if(!w){
+						log(`connection to node${i} failed`);
+					} else {
+						log(`connection to node${i} succeded`);
+						cb=i;
+						break;
+					}
+				}
+				if(cb==false){
+					log("failed to find existing network, starting network");
+					log("rewrite self with data found, init peerjs with specific id");
+				} else {
+					var conn = peer.connect(`openfnm-node${cb}-x`);
+					conn.on('open', function() {
+						//FIP HERE
+					});
+				}
+				/*
+				peer.on('connection', function(conn) {
+					conn.on('data', function(data) {
+						log('Received', data);
+						console.log(data);
+				 	});
+				});
+				var conn = peer.connect(window.prompt("id"));
+				conn.on('open', function() {
+				  // Receive messages
+				  conn.on('data', function(data) {
+					log('Received', data);
+				  });
+				 conn.send('Hello!');
+				});
+				*/
+			}
+			try{
+				log("started");
+				var peer = new Peer();
+				peer.on('open', function(id) {
+				  onReady(id)
+				});
+			}catch(e){
+				log(e);
+			}
+		</script>
+	</body>
+</html>
