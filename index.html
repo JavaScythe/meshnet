@@ -2,10 +2,16 @@
 <html>
 	<head>
 		<title>openFMN</title>
+		<style>
+			body{
+				background-color: #000;
+			}
+			*{color:#fff;}
+		</style>
 	</head>
 	<body>
 		<pre id="logs">log top</pre>
-		<script src="https://unpkg.com/peerjs@1.3.1/dist/peerjs.min.js"></script>
+		<script src="/peerjs.js"></script>
 		<script>
 			function log(m){
 				document.getElementById("logs").textContent = document.getElementById("logs").textContent+"\n"+m;
@@ -22,7 +28,7 @@
 			}
 			async function onReady(id){
 				log("readied peerjs with id "+id);
-				var cb = false;
+				var cb = "nullfound";
 				for(var i = 0; i<=10; i++){
 					//`openfnm-node${i}-x`
 					//"603f7dde-1d37-425b-8f5c-0e2a081a5859"
@@ -36,31 +42,65 @@
 						break;
 					}
 				}
-				if(cb==false){
+				if(cb=="nullfound"){
 					log("failed to find existing network, starting network");
 					log("rewrite self with data found, init peerjs with specific id");
+					window._openfmn = {
+						"created": new Date(),
+						"nodes": [
+							"openfnm-node0-x"
+						]
+					}
+					peer.destroy();
+					peer = new Peer(`openfnm-node0-x`);
+					peer.on('open', function(id) {
+						log("registered as "+id+", defining join functions");
+						participate(peer);
+					});
 				} else {
 					var conn = peer.connect(`openfnm-node${cb}-x`);
 					conn.on('open', function() {
-						//FIP HERE
+						conn.send({
+							"type": "join",
+							"time": new Date()
+						});
+						conn.on("data", function(data){
+							if(data.type == "jmap"){
+								log("got network map to join");
+								console.log(data.map);
+								joinNetwork(data.map);
+							}
+						});
 					});
 				}
-				/*
+			}
+			function joinNetwork(map){
+				var cid = undefined;
+				for(var i=0;i>-1;i++){
+					var f = false;
+					if(map.nodes.indexOf(`openfnm-node${i}-x`) == -1){
+						f=true;
+					}
+					if(f){
+						cid = i;
+						break;
+					}
+					if(i>500) {log("critical no id 500 && throw");throw "";};
+				}
+				log("register with id "+cid);
+			}
+			function participate(peer){
 				peer.on('connection', function(conn) {
 					conn.on('data', function(data) {
-						log('Received', data);
-						console.log(data);
-				 	});
+						log('Received '+JSON.stringify(data));
+						if(data.type == "join"){
+							conn.send({
+								type: "jmap",
+								map: window._openfmn
+							});
+						}
+					});
 				});
-				var conn = peer.connect(window.prompt("id"));
-				conn.on('open', function() {
-				  // Receive messages
-				  conn.on('data', function(data) {
-					log('Received', data);
-				  });
-				 conn.send('Hello!');
-				});
-				*/
 			}
 			try{
 				log("started");

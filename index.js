@@ -5,5 +5,8 @@ const app = express();
 app.get("/",(req,res)=>{
 	res.sendFile(__dirname+"/index.html");
 });
+app.get("/peerjs.js",(req,res)=>{
+	res.sendFile(__dirname+"/peerjs.js");
+})
 app.listen(3000);//def port 4 goorm
 console.log("on at :3000");
