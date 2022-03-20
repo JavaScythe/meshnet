@@ -1,2 +1,2 @@
 # openFMS
-fip: handshake with discovered
+handle onclose and onerr

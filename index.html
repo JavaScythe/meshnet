@@ -46,9 +46,9 @@
 					log("failed to find existing network, starting network");
 					log("rewrite self with data found, init peerjs with specific id");
 					window._openfmn = {
-						"created": new Date(),
+						"created": new Date().getTime(),
 						"nodes": [
-							"openfnm-node0-x"
+							{id: "0", join: new Date().getTime() }
 						]
 					}
 					peer.destroy();
@@ -62,24 +62,26 @@
 					conn.on('open', function() {
 						conn.send({
 							"type": "join",
-							"time": new Date()
+							"time": new Date().getTime()
 						});
 						conn.on("data", function(data){
 							if(data.type == "jmap"){
 								log("got network map to join");
 								console.log(data.map);
-								joinNetwork(data.map);
+								joinNetwork(data.map,cb);
 							}
 						});
 					});
 				}
 			}
-			function joinNetwork(map){
+			function joinNetwork(map,entry){
 				var cid = undefined;
 				for(var i=0;i>-1;i++){
-					var f = false;
-					if(map.nodes.indexOf(`openfnm-node${i}-x`) == -1){
-						f=true;
+					var f = true
+					for(var k in map.nodes){
+						if(map.nodes[k]["id"] == i){
+							f=false;
+						}
 					}
 					if(f){
 						cid = i;
@@ -88,16 +90,46 @@
 					if(i>500) {log("critical no id 500 && throw");throw "";};
 				}
 				log("register with id "+cid);
+				var conn = peer.connect(`openfnm-node${entry}-x`);
+				conn.on('open', function() {
+					conn.send({
+						"type": "register",
+						"id": cid,
+						"time": new Date().getTime()
+					});
+					conn.on("data", function(data){
+						if(data.type == "welcome"){
+							log("accepted into network with new network map: ");
+							log(JSON.stringify(data));
+							window._openfmn = data.jmap;
+							peer.destroy();
+							peer = new Peer(`openfnm-node${cid}-x`);
+							participate(peer);
+						}
+					});
+				});
 			}
 			function participate(peer){
 				peer.on('connection', function(conn) {
 					conn.on('data', function(data) {
 						log('Received '+JSON.stringify(data));
 						if(data.type == "join"){
+							console.log("sent map to discovering peer");
 							conn.send({
 								type: "jmap",
 								map: window._openfmn
 							});
+						}
+						if(data.type == "register"){
+							console.log("made discover to node (type:welcome)");
+							window._openfmn["nodes"].push({
+								id: data.id,
+								time: new Date().getTime()
+							});
+							conn.send({
+								type: "welcome",
+								jmap: window._openfmn
+							})
 						}
 					});
 				});
@@ -106,7 +138,11 @@
 				log("started");
 				var peer = new Peer();
 				peer.on('open', function(id) {
-				  onReady(id)
+					peer.on('open', function(id){
+						log("re registered with id "+id);
+					});
+					log("fired onready event");
+					onReady(id)
 				});
 			}catch(e){
 				log(e);
