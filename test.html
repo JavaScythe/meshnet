@@ -1,0 +1,8 @@
+<script src="/peerjs.js"></script>
+<script>
+var peer = new Peer("openfmn-node1-x", {debug: "3"});
+	var conn = peer.connect(`openfmn-node${window.prompt("id")}-x`);
+	conn.on("open", function(){
+		alert("gottem");
+	})
+</script>

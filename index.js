@@ -5,6 +5,9 @@ const app = express();
 app.get("/",(req,res)=>{
 	res.sendFile(__dirname+"/index.html");
 });
+app.get("/test",(req,res)=>{
+	res.sendFile(__dirname+"/test.html");
+});
 app.get("/peerjs.js",(req,res)=>{
 	res.sendFile(__dirname+"/peerjs.js");
 })

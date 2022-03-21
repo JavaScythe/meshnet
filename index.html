@@ -23,7 +23,7 @@
 					con=true;
 					conn.close();
 				});
-				await new Promise(resolve => setTimeout(resolve, 1000));
+				await new Promise(resolve => setTimeout(resolve, 400));
 				return con;
 			}
 			async function onReady(id){
@@ -48,11 +48,12 @@
 					window._openfmn = {
 						"created": new Date().getTime(),
 						"nodes": [
-							{id: "0", join: new Date().getTime() }
+							{id: "0", time: new Date().getTime() }
 						]
 					}
+					window._cid = 0;
 					peer.destroy();
-					peer = new Peer(`openfnm-node0-x`);
+					peer = new Peer(`openfnm-node0-x`, {"debug": 1});
 					peer.on('open', function(id) {
 						log("registered as "+id+", defining join functions");
 						participate(peer);
@@ -102,9 +103,16 @@
 							log("accepted into network with new network map: ");
 							log(JSON.stringify(data));
 							window._openfmn = data.jmap;
+							window._cid = cid;
+							conn.close();
 							peer.destroy();
-							peer = new Peer(`openfnm-node${cid}-x`);
-							participate(peer);
+							peer = new Peer(`openfnm-node${cid}-x`, {"debug": 1});
+							peer.on("open", function(){
+								log("peer opened");
+								participate(peer);
+								window._con = {};
+								connectTo(window._openfmn["nodes"]);
+							});
 						}
 					});
 				});
@@ -114,29 +122,85 @@
 					conn.on('data', function(data) {
 						log('Received '+JSON.stringify(data));
 						if(data.type == "join"){
-							console.log("sent map to discovering peer");
+							log("sent map to discovering peer");
 							conn.send({
 								type: "jmap",
 								map: window._openfmn
 							});
 						}
 						if(data.type == "register"){
-							console.log("made discover to node (type:welcome)");
 							window._openfmn["nodes"].push({
 								id: data.id,
 								time: new Date().getTime()
 							});
+							log("made discover to node (type:welcome)");
 							conn.send({
 								type: "welcome",
 								jmap: window._openfmn
-							})
+							});
+							connectTo(window._openfmn["nodes"]);
+							setTimeout(function(){
+								broadcast({
+									"type": "new",
+									"jmap": window._openfmn
+								});
+							}, 1000);
+						}
+						if(data.type == "new"){
+							log("Updating memeber list");
+							window._openfmn = data.jmap;
+							connectTo(data.jmap["nodes"]);
 						}
 					});
 				});
 			}
+			function connectTo(net){
+				if(window._con == undefined)window._con = {};
+				log("establishing new paths from "+JSON.stringify(net));
+				for(var i in net){
+					console.log(Object.keys(window._con), net[i]["id"]);
+					if(net[i]["id"] == window._cid || Object.keys(window._con).indexOf(net[i]["id"]+"") != -1){
+						log(`omit ${net[i]["id"]} for ${net[i]["id"] == window._cid}:${Object.keys(window._con).indexOf(net[i]["id"]+"") != -1}`)
+						continue;
+					}
+					log(`paving to node ${net[i]["id"]}`);
+					regularParticipate(net[i]["id"]);
+				}
+				console.log(window._con);
+			}
+			function regularParticipate(pif){
+				var conn = peer.connect(`openfnm-node${pif}-x`);
+				window._con[pif] = conn;
+				//forward, handle leaves
+				conn.on('open', function() {
+					log("got regNet "+pif);
+				});
+				conn.on("data", function(data){
+					log("[regularNetwork]: got "+JSON.stringify(data));
+				});
+				conn.on("close", function(){
+					log("regNet: conn closed to id "+pif);
+					delete window._con[pif];
+					for(var i in window._openfmn["nodes"]){
+						if(window._openfmn["nodes"][i]["id"] == pif){
+							window._openfmn["nodes"].splice(i, 1);
+						}
+					}
+					log("now connected to "+Object.keys(window._con).length+" nodes");
+					log("^^^^ "+Object.keys(window._con).join(", "));
+					console.log(window._con);
+				});
+			}
+			function broadcast(data){
+				log("! - Broadcast: to "+Object.keys(window._con).length+" nodes");
+				for(var i in window._con){
+					window._con[i].send(data);
+					log("sent data to node"+i);
+				}
+			}
 			try{
 				log("started");
-				var peer = new Peer();
+				var peer = new Peer({"debug": 1});
 				peer.on('open', function(id) {
 					peer.on('open', function(id){
 						log("re registered with id "+id);
